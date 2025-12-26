@@ -60,6 +60,7 @@ executable Wordle
 
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
+    other-modules:    Logic, PlayerMode, AiMode
 
     -- Modules included in this executable, other than Main.
     -- other-modules:
