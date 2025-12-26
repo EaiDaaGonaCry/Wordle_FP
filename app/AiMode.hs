@@ -67,9 +67,9 @@ colorCode codeChar
 parserTriplets :: String -> String -> [(Char, Int, String)]
 parserTriplets guess pattern = [ (letter, pos, colorCode code) | (letter, code, pos) <- zip3 guess pattern [0..] ]
 
-bestWord :: [String] -> String -> Int -> IO ()
-bestWord [] _ _=  putStrLn (paintStr ("\n==============================" ++ "\n--- No possible words left! ---\n" ++ "==============================\n") red)
-bestWord dictionary allwrong atempt = do
+aiLoop :: [String] -> String -> Int -> IO ()
+aiLoop [] _ _=  putStrLn (paintStr ("\n==============================" ++ "\n--- No possible words left! ---\n" ++ "==============================\n") red)
+aiLoop dictionary allwrong atempt = do
     putStrLn (paintStr ("\n--- Possible words left: " ++ show (length dictionary) ++ " ---\n") red)
     if allwrong == "xxxxx" 
         then do
@@ -93,12 +93,12 @@ bestWord dictionary allwrong atempt = do
                     let filteredDict = filterColours dictionary triples
                     let newDictionary = filter (/= guessWord) filteredDict
 
-                    bestWord newDictionary colourLine (atempt + 1)
+                    aiLoop newDictionary colourLine (atempt + 1)
         else do
             let scores = [ (word, scoreCount word dictionary) | word <- dictionary ]
             let maxScore = maximum [ score | (_, score) <- scores ]
-            let bestWords = [ word | (word, score) <- scores , score == maxScore ]
-            let chosenWord = head bestWords
+            let aiLoops = [ word | (word, score) <- scores , score == maxScore ]
+            let chosenWord = head aiLoops
 
             putStrLn (paintStr "==================================" yellow)
             putStrLn (paintStr ("---Attempt number " ++ show atempt ++ ": ---") yellow)
@@ -116,11 +116,11 @@ bestWord dictionary allwrong atempt = do
                     let filteredDict = filterColours dictionary triples
                     let newDictionary = filter (/= chosenWord) filteredDict
                     
-                    bestWord newDictionary colourLine (atempt + 1)
+                    aiLoop newDictionary colourLine (atempt + 1)
 
 
-aiLoop :: [String] -> IO ()
-aiLoop []  = putStrLn (paintStr " ---Empty dictionary---" red)
-aiLoop dictionary = do
+aiMode :: [String] -> IO ()
+aiMode []  = putStrLn (paintStr " ---Empty dictionary---" red)
+aiMode dictionary = do
     putStrLn (paintStr "\n--- AI MODE STARTED ---\n" yellow)
-    bestWord dictionary "xxxxx" 1
+    aiLoop dictionary "xxxxx" 1

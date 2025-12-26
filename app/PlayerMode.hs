@@ -1,4 +1,5 @@
 module PlayerMode where
+import System.Random (randomRIO)
 import Logic
 
 gameLoop :: String -> [String] -> [(Char, String)] -> Int -> IO ()
@@ -34,4 +35,15 @@ gameLoop secretWord validWords currentAlphabet attempts = do
                 if guess == secretWord
                     then putStrLn (paintStr ("\n==============================" ++ "\n      --- YOU WIN! ---\n" ++ "==============================\n") green)
                     else gameLoop secretWord validWords newAlphabet (attempts - 1)
+
+playerMode :: [String] -> Int -> IO ()
+playerMode allWords wordCount = do
+    randomIndex <- randomRIO (0, wordCount - 1)
+    let secretWord = getWordByIndex allWords randomIndex
+            
+    putStrLn ("Picked random index: " ++ show randomIndex)
+    putStrLn ("The secret word is: " ++ secretWord)
+
+    putStrLn ("\n" ++ "--- WORDLE GAME STARTED ---")
+    gameLoop secretWord allWords alphabetList 6
 
