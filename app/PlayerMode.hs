@@ -1,20 +1,22 @@
 module PlayerMode where
 import System.Random (randomRIO)
-import Logic
+import Logic        
 
-renderTriplets :: [(Char, Int, String)] -> String
+renderTriplets :: [LetterInfo] -> String
 renderTriplets triplets = foldr (\(x,_,z) acc -> acc ++ colorize [x] z) [] sorted
   where sorted = tripletsSorter triplets
 
-gameLoopExpert :: String -> [String] -> [[(Char, Int, String)]] -> [(Char, String)] -> Int -> Int -> IO ()
+gameLoopExpert :: String -> [String] -> [[LetterInfo]] -> [(Char, ColorCode)] -> Int -> Int -> IO ()
 gameLoopExpert secretWord _ _ _ 0 _= do
-    putStrLn (paintStr "==============================" red)
-    putStrLn (paintStr "       --- GAME OVER! ---" red)
-    putStrLn ("The word was: " ++ paintStr secretWord green)
-    putStrLn (paintStr "==============================\n" red)
+    putStrLn (paintStr "=============================="                 red)
+    putStrLn (paintStr "      --- GAME OVER! ---"                       red)
+    putStrLn (paintStr "     The word was: " red ++ paintStr secretWord red)
+    putStrLn (paintStr "==============================\n"               red)
+
 
 gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts turnWithLie = do
-    putStrLn ("\n==============================\n" ++ "Attempts left: " ++ show attempts)
+    putStrLn ( paintStr "\n=============================================================\n" yellow ++ "Attempts left: " ++ show attempts)
+
 
     putStr "Keyboard: "
     printAlphabet currentAlphabet
@@ -24,11 +26,11 @@ gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts tur
 
     if length guess /= 5
         then do
-            putStrLn (paintStr "\n --- Word must be exactly 5 letters! ---" yellow)
+            putStrLn (paintStr "          --- Word must be exactly 5 letters! ---" yellow)
             gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts turnWithLie
         else if guess `notElem` validWords
             then do
-                putStrLn "Not in word list!"
+                putStrLn (paintStr "         --- This word is not in the word list! ---" yellow)
                 gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts turnWithLie 
 
             else do
@@ -39,19 +41,11 @@ gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts tur
                             putStrLn ("The word was: " ++ paintStr secretWord green)
                             putStrLn (paintStr "==============================\n" green)
                     else do
-                        -- Lie blocking logic
                         if turnWithLie == 1 then do
-                            -- let test1 = generateLie historyOfWords validWords guess secretWord
-                            -- let test2 = generateLieDABNGFADBUAD historyOfWords validWords guess secretWord
-                            -- let ltest1 = length test1
-                            -- let ltest2 = length test2
-                            -- putStrLn ("Length of maybeLie: " ++ show ltest1 ++ renderTriplets (head test1)++ " " ++ renderTriplets (head (tail  test1)))
-                            -- putStrLn ("Length of maybeLie: " ++ show ltest2 ++ renderTriplets (head test2)++ " " ++ renderTriplets (head (tail  test2)))
                             let maybeLie = generateLie historyOfWords validWords guess secretWord
 
                             case maybeLie of
                                 Nothing -> do
-                                    --putStrLn ("No word")
                                     putStrLn (letterPainter guess secretWord)
                                     let newAlphabet = alphabetPainter guess secretWord currentAlphabet
                                     gameLoopExpert secretWord validWords historyOfWords newAlphabet (attempts - 1) (turnWithLie - 1)
@@ -68,15 +62,15 @@ gameLoopExpert secretWord validWords historyOfWords currentAlphabet attempts tur
                             gameLoopExpert secretWord validWords (historyOfWords ++ [tripleVec guess secretWord]) newAlphabet (attempts - 1) (turnWithLie - 1)
 
 
-gameLoopMedium :: String -> [String] -> [(Char, String)] -> Int -> IO ()
+gameLoopMedium :: String -> [String] -> [(Char, ColorCode)] -> Int -> IO ()
 gameLoopMedium secretWord _ _ 0 = do
-    putStrLn (paintStr "==============================" red)
-    putStrLn (paintStr "       --- GAME OVER! ---" red)
-    putStrLn ("The word was: " ++ paintStr secretWord green)
-    putStrLn (paintStr "==============================\n" red)
+    putStrLn (paintStr "=============================="                 red)
+    putStrLn (paintStr "      --- GAME OVER! ---"                       red)
+    putStrLn (paintStr "     The word was: " red ++ paintStr secretWord red)
+    putStrLn (paintStr "==============================\n"               red)
 
 gameLoopMedium secretWord validWords currentAlphabet attempts = do
-    putStrLn ("\n==============================\n" ++ "Attempts left: " ++ show attempts)
+    putStrLn ( paintStr "\n=============================================================\n" yellow ++ "Attempts left: " ++ show attempts)
 
     putStr "Keyboard: "
     printAlphabet currentAlphabet
@@ -86,11 +80,11 @@ gameLoopMedium secretWord validWords currentAlphabet attempts = do
 
     if length guess /= 5
         then do
-            putStrLn (paintStr "\n --- Word must be exactly 5 letters! ---" yellow)
+            putStrLn (paintStr "          --- Word must be exactly 5 letters! ---" yellow)
             gameLoopMedium secretWord validWords currentAlphabet attempts
         else if guess `notElem` validWords
             then do
-                putStrLn "Not in word list!"
+                putStrLn (paintStr "         --- This word is not in the word list! ---" yellow)
                 gameLoopMedium secretWord validWords currentAlphabet attempts
 
             else do
@@ -101,13 +95,43 @@ gameLoopMedium secretWord validWords currentAlphabet attempts = do
                     then putStrLn (paintStr ("\n==============================" ++ "\n      --- YOU WIN! ---\n" ++ "==============================\n") green)
                     else gameLoopMedium secretWord validWords newAlphabet (attempts - 1)
 
+gameLoopEasy :: String -> [String] -> [(Char, ColorCode)] -> Int -> IO ()
+gameLoopEasy secretWord _ _ 0 = do
+    putStrLn (paintStr "=============================="                 red)
+    putStrLn (paintStr "      --- GAME OVER! ---"                       red)
+    putStrLn (paintStr "     The word was: " red ++ paintStr secretWord red)
+    putStrLn (paintStr "==============================\n"               red)
+
+gameLoopEasy secretWord validWords currentAlphabet attempts = do
+    putStrLn ( paintStr "\n=============================================================\n" yellow ++ "Attempts left: " ++ show attempts)
+
+    putStr "Keyboard: "
+    printAlphabet currentAlphabet
+
+    putStrLn "Enter your guess: "
+    guess <- getLine
+
+    if length guess /= 5
+        then do
+            putStrLn (paintStr "          --- Word must be exactly 5 letters! ---" yellow)
+            gameLoopEasy secretWord validWords currentAlphabet attempts
+        else if guess `notElem` validWords
+            then do
+                putStrLn (paintStr "         --- This word is not in the word list! ---" yellow)
+                gameLoopEasy secretWord validWords currentAlphabet attempts
+
+            else do
+                putStrLn (letterPainter guess secretWord)
+                let newAlphabet = alphabetPainter guess secretWord currentAlphabet
+
+                if guess == secretWord
+                    then putStrLn (paintStr ("\n==============================" ++ "\n      --- YOU WIN! ---\n" ++ "==============================\n") green)
+                    else gameLoopEasy secretWord validWords newAlphabet (attempts - 1)
+
 playerMode :: [String] -> Int -> IO ()
 playerMode allWords wordCount = do
     randomIndex <- randomRIO (0, wordCount - 1)
     let secretWord = getWordByIndex allWords randomIndex
-            
-    putStrLn ("Picked random index: " ++ show randomIndex)
-    putStrLn ("The secret word is: " ++ secretWord)
 
     let border     = "+======================+"
     let emptySpace = "\n|                      |"
@@ -124,15 +148,23 @@ playerMode allWords wordCount = do
     mode <- getLine
 
     if mode == "1" then do
-            putStrLn ("\n" ++ "--- WORDLE GAME STARTED: Easy difficulty ---")
-            gameLoopMedium secretWord allWords alphabetList 6
+            putStrLn (paintStr "=============================================================\n" green)
+            putStrLn (paintStr "         --- WORDLE GAME STARTED: Easy difficulty ---\n"         green)
+            putStrLn (paintStr "=============================================================\n" green)
+            gameLoopEasy secretWord allWords alphabetList 6
 
         else if mode == "2" then do
-            putStrLn ("\n" ++ "--- WORDLE GAME STARTED: Medium difficulty---")
+            putStrLn (paintStr "=============================================================\n" yellow)
+            putStrLn (paintStr "         --- WORDLE GAME STARTED: Medium difficulty ---\n"       yellow)
+            putStrLn (paintStr "=============================================================\n" yellow)
             gameLoopMedium secretWord allWords alphabetList 6
+
             else if mode == "3" then do
-                putStrLn ("\n" ++ "--- WORDLE GAME STARTED: Hard difficulty---")
+                putStrLn (paintStr "=============================================================\n" red)
+                putStrLn (paintStr "         --- WORDLE GAME STARTED: Hard difficulty ---\n"         red)
+                putStrLn (paintStr "=============================================================\n" red)
                 rnd_lie <- randomRIO (1, 5)
                 gameLoopExpert secretWord allWords [] alphabetList 6 rnd_lie
             else do
                 putStrLn (paintStr "\n==============================" red ++ "\n   --- Invalid mode! ---\n" ++ "==============================\n")
+                playerMode allWords wordCount

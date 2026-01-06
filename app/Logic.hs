@@ -1,31 +1,56 @@
 module Logic where
-alphabetList :: [(Char, String)]
+import Data.List (sort, group)
+
+-- ТИПОВЕ
+
+-- Тип за ANSI цветови код (напр. "\ESC[32m")
+type ColorCode = String
+-- Основната структура за информация: (Буква, Позиция, Цвят)
+type LetterInfo = (Char, Int, ColorCode)
+-- Структура за AI режима "Експерт": (Дума, Брой натрупани грешки)
+type ScoredWord = (String, Int)
+
+-- Списък с всички букви от азбуката и началния им цвят (Reset)
+alphabetList :: [(Char, ColorCode)]
 alphabetList = zip ['a'..'z'] (repeat reset)
 
-green :: String
+-- ANSI кодове за оцветяване на конзолата
+green :: ColorCode
 green  = "\ESC[32m"
-yellow :: String
+yellow :: ColorCode
 yellow = "\ESC[33m"
-gray :: String
+gray :: ColorCode
 gray   = "\ESC[90m"
-red :: String
+red :: ColorCode
 red = "\ESC[31m"
-reset :: String
+reset :: ColorCode
 reset  = "\ESC[0m"
 
-colorize :: [Char] -> [Char] -> [Char]
+-- Помощна функция, която оцветява даден низ със зададен цвят и връща Reset накрая
+colorize :: [Char] -> ColorCode -> [Char]
 colorize letter code = code ++ letter ++ reset
 
---- Here starts the logic for GAME MODE --*
+-- Превръща символ ('g', 'y', 'x') в съответния ANSI код
+colorCode :: Char -> String
+colorCode codeChar
+    | codeChar == 'g' = green
+    | codeChar == 'y' = yellow
+    | otherwise       = gray
 
-greenLetters :: (Eq a) => [a] -> [a] -> Int -> [(a, Int, String)]
+-- =============================================================================
+-- ОСНОВНА ЛОГИКА НА ИГРАТА (режим игра)
+-- =============================================================================
+
+-- Намира зелените букви и връща списък с намерените зелени тройки.
+greenLetters :: (Eq a) => [a] -> [a] -> Int -> [(a, Int, ColorCode)]
 greenLetters _ [] _ = []
 greenLetters [] _ _ = []
 greenLetters (x:xs) (y:ys) pos 
     | x == y          = (x, pos, green) : greenLetters xs ys (1 + pos)
     | otherwise       = greenLetters xs ys (1 + pos)
 
-yellowLetters :: String -> String -> Int -> [(Char, Int, String)]
+-- Намира жълтите букви и връща списък с намерените жълти тройки.
+yellowLetters :: String -> String -> Int -> [LetterInfo]
 yellowLetters [] _  _= []
 yellowLetters (x:xs) word pos
     | x `elem` word && x /= '_'  =  (x, pos, yellow) : yellowLetters xs (rfm x word) (1 + pos)
@@ -36,21 +61,23 @@ yellowLetters (x:xs) word pos
                 | s == z     = '_' : zs
                 | otherwise  = z : rfm s zs
 
-grayLetters :: String -> Int -> [(Char, Int, String)]
+-- Намира сивите букви и връща списък с намерените сиви тройки.
+grayLetters :: String -> Int -> [LetterInfo]
 grayLetters [] _ = []
 grayLetters (x:xs) pos 
     | x /= '_'    =  (x, pos, gray) : grayLetters xs (1 + pos)
     | otherwise   =  grayLetters xs (1 + pos)
 
-greenReplacer :: [Char] -> [(Char, Int, c)] -> Int -> [Char]
+-- Замества намерените зелени букви с '_' в даден низ
+greenReplacer :: [Char] -> [LetterInfo] -> Int -> [Char]
 greenReplacer [] _ _= []
 greenReplacer x [] _= x
 greenReplacer (x:xs) ((l,p,s):other) pos
     | x == l && p == pos  = '_' : greenReplacer xs other (pos + 1)
     | otherwise           = x : greenReplacer xs ((l,p,s):other) (pos + 1)
 
-
-yellowReplacer :: [Char] -> [(Char, Int, c)] -> [Char]
+-- Замества намерените жълти букви с '_' в даден низ
+yellowReplacer :: [Char] -> [LetterInfo] -> [Char]
 yellowReplacer [] _= []
 yellowReplacer x []= x
 yellowReplacer lst ((l,_,_):other) = yellowReplacer (rfm l lst) other where
@@ -58,7 +85,9 @@ yellowReplacer lst ((l,_,_):other) = yellowReplacer (rfm l lst) other where
         rfm s (z:zs)
             | s == z     = '_' : zs
             | otherwise  = z : rfm s zs
-tripleVec :: String -> String -> [(Char, Int, String)]
+
+-- Приема предположение и тайна дума. Връща списък с LetterInfo за всяка буква.
+tripleVec :: String -> String -> [LetterInfo]
 tripleVec guess word = greens ++ yellows ++ grays 
     where
     greens  = greenLetters guess word 0
@@ -67,23 +96,27 @@ tripleVec guess word = greens ++ yellows ++ grays
     withouthYellows = yellowReplacer withouthGreens yellows
     grays   = grayLetters withouthYellows 0
 
-tripletsSorter :: [(Char, Int, String)] -> [(Char, Int, String)]
+-- Сортира списъка с резултати по позиция
+tripletsSorter :: [LetterInfo] -> [LetterInfo]
 tripletsSorter [] = []
 tripletsSorter ((x,pos,z):other) = tripletsSorter bigger ++ [(x,pos,z)] ++ tripletsSorter lower where
     lower  = [(s,p,t) | (s,p,t) <- other , p < pos]
     bigger = [(s,p,t) | (s,p,t) <- other , p >= pos]
 
+-- Връща стринга на предположението, оцветен буква по буква според резултата.
 letterPainter :: String -> String -> String
 letterPainter guess word = foldr (\(x,_,z) acc -> acc ++ colorize [x] z) [] triplets where
     triplets = tripletsSorter (tripleVec guess word)
 
-
+-- Взима дума от списък по индекс.
 getWordByIndex :: [String] -> Int -> String
 getWordByIndex [] _ = "ERROR"
 getWordByIndex (x:_) 0 = x
 getWordByIndex (_:xs) n =  getWordByIndex xs (n - 1)
 
-alphabetPainterHelper :: [(Char, String)] -> [(Char, String)] -> [(Char, String)]
+
+-- Помощна функция за обновяване на цветовете на клавиатурата (Alphabet).
+alphabetPainterHelper :: [(Char, ColorCode)] -> [(Char, ColorCode)] -> [(Char, ColorCode)]
 alphabetPainterHelper _ [] = []
 alphabetPainterHelper word ((x,y):letters)
     | y == green || y == gray     = (x,y) : alphabetPainterHelper word letters
@@ -100,22 +133,27 @@ alphabetPainterHelper word ((x,y):letters)
             |z == l          = if colorPriority oldColour >= colorPriority c then elemP z guess oldColour else elemP z guess c
             |otherwise        = elemP z guess oldColour
 
-alphabetPainter :: String -> String -> [(Char, String)] -> [(Char, String)]
+-- Обновява клавиатурата след ход на играча.
+alphabetPainter :: String -> String -> [(Char, String)] -> [(Char, ColorCode)]
 alphabetPainter guess word = alphabetPainterHelper [(l,c) | (l,_,c) <- tripleVec guess word]
 
-paintStr :: [Char] -> [Char] -> [Char]
+-- Оцветява целия стринг в един цвят
+paintStr :: [Char] -> ColorCode -> [Char]
 paintStr str colour = foldr (\x acc -> acc ++ colorize [x] colour) [] (reverse str)
 
---Ai
-printAlphabet :: [(Char, String)] -> IO ()
+-- Принтира клавиатурата на екрана
+printAlphabet :: [(Char, ColorCode)] -> IO ()
 printAlphabet pairs = do
     let stringList = map (\(c, color) -> color ++ [c] ++ reset) pairs
     putStrLn (unwords stringList)
 
 
--- Hard Mode Logic
+-- =============================================================================
+-- HARD MODE ЛОГИКА (режим игра)
+-- =============================================================================
 
-isGoodLie :: Foldable t => t [(Char, Int, String)] -> [(Char, Int, String)] -> Bool
+-- Проверява дали една потенциална лъжа е "добра" (т.е. не противоречи на историята).
+isGoodLie :: Foldable t => t [LetterInfo] -> [LetterInfo] -> Bool
 isGoodLie historyOfWords lieCandidate = all checkForOne historyOfWords where
     checkForOne oldTriplets = yellowContradiction && greenContradiction && grayContradiction
         where
@@ -139,7 +177,8 @@ isGoodLie historyOfWords lieCandidate = all checkForOne historyOfWords where
                     oColour == yellow,
                     nColour == gray || (nColour == green && oPos /= nPos)]
 
-getLieScore :: [(Char, Int, String)] -> Int
+-- Оценява силата на патерна. Зеленото дава най-много точки.
+getLieScore :: [LetterInfo] -> Int
 getLieScore triplets = sum [points c | (_,_,c) <- triplets]
   where
     points color
@@ -148,7 +187,8 @@ getLieScore triplets = sum [points c | (_,_,c) <- triplets]
         | otherwise       = 0
 
 -- AI е използван за направата на проверка за нулева стойност на резултата от generateLie
-generateLie :: Foldable t => t [(Char, Int, String)] -> [String] -> String -> String -> Maybe [(Char, Int, String)]
+-- Генерира лъжлив патерн, ако AI-то реши да излъже.
+generateLie :: Foldable t => t [LetterInfo] -> [String] -> String -> String -> Maybe [LetterInfo]
 generateLie historyOfWords dictionary currentGuess secretWord =
     case idealCandidates of
         (best:_) -> Just best 
@@ -167,10 +207,12 @@ generateLie historyOfWords dictionary currentGuess secretWord =
         
 
 
---- Here starts the logic for AI MODE --*
+-- =============================================================================
+-- ФИЛТРИРАНЕ НА РЕЧНИКА (режим помощник)
+-- =============================================================================
 
-
-clearNotGreenLetters :: [String] -> [(Char, Int, String)] -> [String]
+-- Премахва думи, които нямат правилната буква на зелената позиция.
+clearNotGreenLetters :: [String] -> [LetterInfo] -> [String]
 clearNotGreenLetters [] _ = []
 clearNotGreenLetters (d:dictionary) greens
     | matchAll    = d : clearNotGreenLetters dictionary greens
@@ -178,7 +220,8 @@ clearNotGreenLetters (d:dictionary) greens
     where 
         matchAll = all (\(letter, position, _) -> d !! position == letter) greens
 
-clearGrayLetters :: [String] -> [(Char, Int, String)] -> [String]
+-- Премахва думи, които съдържат буква, маркирана като сива.
+clearGrayLetters :: [String] -> [LetterInfo] -> [String]
 clearGrayLetters [] _ = []
 clearGrayLetters (d:dictionary) grays
     | hasBadLetter = clearGrayLetters dictionary grays
@@ -186,51 +229,74 @@ clearGrayLetters (d:dictionary) grays
     where 
         hasBadLetter = any (\(letter, _, _) -> letter `elem` d) grays
 
-clearNotYellowLetters :: [String] -> [(Char, Int, String)] -> [String]
+-- Премахва думи, които нямат жълтите букви или ги имат точно на същата позиция.
+clearNotYellowLetters :: [String] -> [LetterInfo] -> [String]
 clearNotYellowLetters [] _ = []
 clearNotYellowLetters (d:dictionary) yellows
     | matchAll    = d : clearNotYellowLetters dictionary yellows
     | otherwise = clearNotYellowLetters dictionary yellows
     where 
         matchAll = all (\(letter, position, _) -> letter `elem` d && d !! position /= letter) yellows
-filterColours :: [String] -> [(Char, Int, String)] -> [String]
+
+-- Главна функция за филтриране: комбинира логиката за Зелено, Жълто и Сиво.
+filterColours :: [String] -> [LetterInfo] -> [String]
 filterColours dictionary triples = 
     clearNotYellowLetters (clearNotGreenLetters (clearGrayLetters dictionary effectiveGrays) greens) yellows
     where
         greens  = [(l, p, c) | (l, p, c) <- triples, c == green]
         yellows = [(l, p, c) | (l, p, c) <- triples, c == yellow]
-        
-        -- Всички "сиви" от входа
         rawGrays = [(l, p, c) | (l, p, c) <- triples, c == gray]
 
-        -- Списък с букви, които знаем, че СЪЩЕСТВУВАТ (зелени или жълти)
         safeChars = [l | (l, _, _) <- greens] ++ [l | (l, _, _) <- yellows]
-
-        -- Филтрираме сивите: Оставяме само тези, които НЕ са в списъка safeChars.
-        -- Така второто 'O' ще бъде изхвърлено от сивия списък и няма да изтрие думата "POWER".
         effectiveGrays = filter (\(l, _, _) -> not (l `elem` safeChars)) rawGrays
--- tripletsSorter (tripleVec guess word)
 
-allVariants :: String -> [String] -> [[String]]
+
+-- Генерира всички възможни цветови патерни за дадена дума спрямо целия речник.
+allVariants :: String -> [String] -> [[ColorCode]]
 allVariants d dictionary = [ [colour | (_,_,colour) <- tripletsSorter (tripleVec d word)] | word <- dictionary]
 
+-- Брои колко често се среща всеки уникален патерн.
 uniqueVariantsCount :: Eq a => [a] -> [(a, Int)]
 uniqueVariantsCount [] = [] 
 uniqueVariantsCount (s:strings) = (s , countDup) : uniqueVariantsCount removedDup where
     countDup   = 1 + length [ x | x <- strings , x == s]
     removedDup =        [ x | x <- strings , x /= s]
 
-
+-- Изчислява резултат за думата. По-висок резултат значи, че думата разделя речника по-добре
 scoreCount :: String -> [String] -> Int
 scoreCount d dictionary = foldr (\(_,cnt) acc -> acc + cnt * (totalCount - cnt)) 0 variations where
     variations = uniqueVariantsCount (allVariants d dictionary) 
     totalCount = sum [ cnt | (_,cnt) <- variations ]
 
-colorCode :: Char -> String
-colorCode codeChar
-    | codeChar == 'g' = green
-    | codeChar == 'y' = yellow
-    | otherwise       = gray
 
-parserTriplets :: String -> String -> [(Char, Int, String)]
+-- Помощна функция за парсване на вход от потребителя.
+parserTriplets :: String -> String -> [LetterInfo]
 parserTriplets guess pattern = [ (letter, pos, colorCode code) | (letter, code, pos) <- zip3 guess pattern [0..] ]
+
+-- =============================================================================
+-- HARD MODE ЛОГИКА (режим помощник)
+-- =============================================================================
+
+-- Обновява списъка с кандидати за Expert Mode.
+updateCandidateWords :: [ScoredWord] -> String -> [ColorCode] -> [ScoredWord]
+updateCandidateWords dictionary lastGuess userInput = 
+    filter isStillPossibleWords (map checkEveryWord dictionary) 
+    where
+        checkEveryWord (word, errors) = (word, newErrors) where
+            possiblePattern = reverse [colour | (_,_,colour) <- tripletsSorter (tripleVec lastGuess word)]
+            newErrors = if userInput == possiblePattern then errors else errors + 1
+        isStillPossibleWords (_, err) = err <= 1
+
+-- Оптимизирана версия на броенето за AI Expert Mode.
+uniqueVariantsCountAI :: Ord a => [a] -> [(a, Int)]
+uniqueVariantsCountAI xs = map (\g -> (head g, length g)) (group (sort xs))
+
+
+-- Превръща стринг от типа "gyx" в списък от ColorCodes
+charsToColours :: String -> [ColorCode]
+charsToColours [] = []
+charsToColours (x:xs) 
+    | x == 'g'  = green : charsToColours xs
+    | x == 'y'  = yellow : charsToColours xs
+    | otherwise = gray : charsToColours xs
+        
