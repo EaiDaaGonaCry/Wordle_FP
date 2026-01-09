@@ -1,10 +1,8 @@
 module Main where
 
-import System.Random (randomRIO)
-
-import Logic
-import PlayerMode
-import AiMode
+import Logic ( paintStr, green, red, filterByWordLength )
+import PlayerMode ( playerMode )
+import AiMode ( aiMode )
 
 mainMenuLoop :: [String] -> Int -> IO ()
 mainMenuLoop allWords wordCount = do
@@ -16,18 +14,27 @@ mainMenuLoop allWords wordCount = do
     putStrLn (paintStr ("|  Pick gamemode (1/3) |" ++ emptySpace) green)
     putStrLn (paintStr ("|---> (1) Game mode    |" ++ emptySpace) green)
     putStrLn (paintStr ("|---> (2) Helper mode  |" ++ emptySpace) green)
-    putStrLn (paintStr ("|---> (3) Exit         |" ++ emptySpace) green) -- Added Exit option
+    putStrLn (paintStr ("|---> (3) Exit         |" ++ emptySpace) green) 
     putStrLn (paintStr border green)
     
-    mode <- getLine
+    mode <- getLine 
+
+    putStrLn (paintStr border green)
+    putStrLn (paintStr "|   Pick word length   |" green)
+    putStrLn (paintStr border green)
+
+    inputStr <- getLine
+    let wordLength = read inputStr :: Int
+
+    let dictionary = filterByWordLength allWords wordLength
 
     if mode == "1" then do
-        playerMode allWords wordCount
+        playerMode dictionary wordCount wordLength
         putStrLn "\nPress Enter to return to menu..."
         _ <- getLine
         mainMenuLoop allWords wordCount
         else if mode == "2" then do
-            aiMode allWords
+            aiMode dictionary wordLength
             putStrLn "\nPress Enter to return to menu..."
             _ <- getLine
             mainMenuLoop allWords wordCount
@@ -46,5 +53,4 @@ main = do
     if wordCount == 0 
         then putStrLn "The file is empty!"
         else do
-            -- 2. Start the recursive loop
             mainMenuLoop allWords wordCount

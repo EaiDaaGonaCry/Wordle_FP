@@ -5,9 +5,11 @@ import Data.List (sort, group)
 
 -- Тип за ANSI цветови код (напр. "\ESC[32m")
 type ColorCode = String
--- Основната структура за информация: (Буква, Позиция, Цвят)
+-- Основната структура режим игра - информация: (Буква, Позиция, Цвят)
 type LetterInfo = (Char, Int, ColorCode)
--- Структура за AI режима "Експерт": (Дума, Брой натрупани грешки)
+-- Структура за режим игра "лесен": (Дума, Позиция)
+type LetterPos = (Char, Int)
+-- Структура за режим помощник "Експерт": (Дума, Брой натрупани грешки)
 type ScoredWord = (String, Int)
 
 -- Списък с всички букви от азбуката и началния им цвят (Reset)
@@ -36,6 +38,16 @@ colorCode codeChar
     | codeChar == 'g' = green
     | codeChar == 'y' = yellow
     | otherwise       = gray
+
+-- =============================================================================
+-- ФИЛТРИРАНЕ НА РЕЧНИКА (ПО РАЗМЕР НА ДУМАТА)
+-- =============================================================================
+
+filterByWordLength :: [String] -> Int -> [String]
+filterByWordLength [] _ = []
+filterByWordLength (d:dictionary) len
+    | length d == len  = d : filterByWordLength dictionary len
+    | otherwise        = filterByWordLength dictionary len
 
 -- =============================================================================
 -- ОСНОВНА ЛОГИКА НА ИГРАТА (режим игра)
@@ -123,6 +135,7 @@ alphabetPainterHelper word ((x,y):letters)
     | otherwise                   = (x, newColor) : alphabetPainterHelper word letters
     where
         newColor = elemP x word y
+        colorPriority :: ColorCode -> Int
         colorPriority colours
             | colours == green  = 3
             | colours == yellow = 2
@@ -146,6 +159,53 @@ printAlphabet :: [(Char, ColorCode)] -> IO ()
 printAlphabet pairs = do
     let stringList = map (\(c, color) -> color ++ [c] ++ reset) pairs
     putStrLn (unwords stringList)
+
+-- =============================================================================
+-- EASY MODE ЛОГИКА (режим игра)
+-- =============================================================================
+
+-- Проверява дали в азбуката има сива буква
+containsGrayLetter :: String -> [(Char, ColorCode)] -> String
+containsGrayLetter [] _ = ""
+containsGrayLetter (x:guess) alphabet
+    | isGray x alphabet = "There is a gray letter in your guess!"
+    | otherwise          = containsGrayLetter guess alphabet where
+        isGray _ [] = False
+        isGray x ((y,ys):res)
+            | x == y  && ys == gray  = True
+            | otherwise              = isGray x res
+
+containsYellowLetter :: String -> [(Char, ColorCode)] -> String
+containsYellowLetter [] _ = ""
+containsYellowLetter letters alphabet = containsAllY letters alphabetY where
+    alphabetY = [char | (char,colour)<-alphabet, colour == yellow]
+    containsAllY _ [] = ""
+    containsAllY [] _ = "There is a missing yellow letter in your guess!"
+    containsAllY (x:xs) ys
+        | x `elem` ys  = containsAllY xs (deleteFirstEncoutner x ys)
+        | otherwise    = containsAllY xs ys
+    deleteFirstEncoutner _ [] = []
+    deleteFirstEncoutner x (y:ys)
+        | x == y    = ys
+        | otherwise = y : deleteFirstEncoutner x ys
+
+containsGreenLetter :: [LetterPos] -> [LetterPos] -> String
+containsGreenLetter _ [] = ""
+containsGreenLetter [] _ = "There is a mismatch in green letter positions!"
+containsGreenLetter ((letter,pos):xs) ((gLetter,gPos):ys)
+    | pos == gPos && letter/=gLetter  = "There is a mismatch in green letter positions!"
+    |pos == gPos && letter == gLetter = containsGreenLetter xs ys
+    | otherwise                       = containsGreenLetter xs ((gLetter,gPos):ys)
+
+
+extractGreenPositions :: [LetterInfo] -> [LetterPos]
+extractGreenPositions  triplets = [(l,p) | (l,p,c) <- triplets, c == green]
+
+positionSort :: [LetterPos] -> [LetterPos]
+positionSort [] = []
+positionSort ((x,pos):other) = positionSort lower ++ [(x,pos)] ++ positionSort bigger where
+    lower  = [(s,p) | (s,p) <- other , p < pos]
+    bigger = [(s,p) | (s,p) <- other , p >= pos] 
 
 
 -- =============================================================================

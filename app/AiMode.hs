@@ -1,10 +1,21 @@
 module AiMode where
 import Logic
+    ( paintStr,
+      red,
+      yellow,
+      green,
+      getWordByIndex,
+      gray,
+      filterColours,
+      scoreCount,
+      parserTriplets,
+      updateCandidateWords,
+      charsToColours,
+      ScoredWord )
 import System.Random (randomRIO)
 
 
-aiLoopExpert :: [ScoredWord] -> Int -> IO ()
-aiLoopExpert dictionary attempt = do
+aiLoopExpert dictionary attempt emptyGrayLines= do
     if null dictionary 
         then putStrLn (paintStr ("\n===============================" ++ "\n--- No possible words left! ---\n" ++ "===============================\n") red)
         else if length dictionary == 1 
@@ -20,7 +31,7 @@ aiLoopExpert dictionary attempt = do
                         rnd <- randomRIO (0, wordCount - 1)
                         let guessWord = getWordByIndex currWords rnd
                         
-                        processGuessExpert dictionary guessWord attempt
+                        processGuessExpert dictionary guessWord attempt emptyGrayLines
                     else do 
                         let currWords = map fst dictionary
                         let scores = [ (word, scoreCount word currWords) | word <- currWords ]
@@ -28,10 +39,10 @@ aiLoopExpert dictionary attempt = do
                         let bestGuesses = [ word | (word, score) <- scores , score == maxScore ]
                         let chosenWord = head bestGuesses
 
-                        processGuessExpert dictionary chosenWord attempt
+                        processGuessExpert dictionary chosenWord attempt emptyGrayLines
 
-processGuessExpert :: [ScoredWord] -> String -> Int -> IO ()
-processGuessExpert dictionary guessWord attempt = do
+
+processGuessExpert dictionary guessWord attempt emptyGrayLines  = do
     putStrLn (paintStr "=================================="                         yellow)
     putStrLn (paintStr ("---      Attempt number " ++ show attempt ++ ":     ---")   yellow)
     putStrLn (paintStr ("--- Is your word: "       ++ guessWord   ++ " ? (y/n)---") yellow)
@@ -44,34 +55,34 @@ processGuessExpert dictionary guessWord attempt = do
             putStrLn ("Enter the pattern (g -" ++ paintStr "green" green ++ ", y - " ++ paintStr "yellow" yellow ++ ", x- " ++ paintStr "gray" gray ++ ")")
             colourLine <- getLine
     
-            if length colourLine /= 5
+            if length colourLine /= length emptyGrayLines
                 then do
-                    putStrLn (paintStr "          --- Word must be exactly 5 letters! ---" yellow)
-                    processGuessExpert dictionary guessWord attempt
+                    putStrLn (paintStr ("          --- Word must be exactly " ++ show (length emptyGrayLines) ++ " letters! ---") yellow)
+                    processGuessExpert dictionary guessWord attempt emptyGrayLines
                 else do
                     let parsedColors = charsToColours colourLine
                     let newDictionary = filter (\(w, _) -> w /= guessWord) (updateCandidateWords dictionary guessWord parsedColors)
-                    aiLoopExpert newDictionary (attempt + 1)
+                    aiLoopExpert newDictionary (attempt + 1) emptyGrayLines
 
 
-aiLoopNormal :: [String] -> String -> Int -> IO ()
-aiLoopNormal [] _ _ =  putStrLn (paintStr ("\n===============================" ++ "\n--- No possible words left! ---\n" ++ "===============================\n") red)
-aiLoopNormal dictionary lastPattern attempt = do
-    if lastPattern == "xxxxx" 
+aiLoopNormal :: [String] -> String -> Int -> String -> IO ()
+aiLoopNormal [] _ _ _=  putStrLn (paintStr ("\n===============================" ++ "\n--- No possible words left! ---\n" ++ "===============================\n") red)
+aiLoopNormal dictionary lastPattern attempt emptyGrayLines = do
+    if lastPattern == emptyGrayLines 
         then do
             let wordCount = length dictionary
             rnd <- randomRIO (0, wordCount - 1)
             let guessWord = getWordByIndex dictionary rnd
-            processGuessNormal dictionary guessWord attempt
+            processGuessNormal dictionary guessWord attempt emptyGrayLines
         else do
             let scores = [ (word, scoreCount word dictionary) | word <- dictionary ]
             let maxScore = maximum [ score | (_, score) <- scores ]
             let candidates = [ word | (word, score) <- scores , score == maxScore ]
             let chosenWord = head candidates
-            processGuessNormal dictionary chosenWord attempt
+            processGuessNormal dictionary chosenWord attempt emptyGrayLines
 
-processGuessNormal :: [String] -> String -> Int -> IO ()
-processGuessNormal dictionary guessWord attempt = do
+processGuessNormal :: [String] -> [Char] -> Int -> [Char] -> IO ()
+processGuessNormal dictionary guessWord attempt emptyGrayLines = do
     putStrLn (paintStr "=================================="                         yellow)
     putStrLn (paintStr ("---      Attempt number " ++ show attempt ++ ":     ---")   yellow)
     putStrLn (paintStr ("--- Is your word: "       ++ guessWord   ++ " ? (y/n)---")  yellow)
@@ -84,20 +95,19 @@ processGuessNormal dictionary guessWord attempt = do
             putStrLn ("Enter the pattern (g -" ++ paintStr "green" green ++ ", y - " ++ paintStr "yellow" yellow ++ ", x- " ++ paintStr "gray" gray ++ ")")
             colourLine <- getLine
             
-            if length colourLine /= 5
+            if length colourLine /= length emptyGrayLines
                 then do
-                     putStrLn (paintStr "          --- Word must be exactly 5 letters! ---" yellow)
-                     processGuessNormal dictionary guessWord attempt
+                     putStrLn (paintStr ("          --- Word must be exactly " ++ show (length emptyGrayLines) ++ " letters! ---") yellow)
+                     processGuessNormal dictionary guessWord attempt emptyGrayLines
                 else do
                     let triples = parserTriplets guessWord colourLine
                     let filteredDict = filterColours dictionary triples
                     let newDictionary = filter (/= guessWord) filteredDict
-                    aiLoopNormal newDictionary colourLine (attempt + 1)
+                    aiLoopNormal newDictionary colourLine (attempt + 1) emptyGrayLines
 
-
-aiMode :: [String] -> IO ()
-aiMode []  = putStrLn (paintStr " ---Empty dictionary---" red)
-aiMode dictionary = do
+aiMode :: [String] -> Int -> IO ()
+aiMode [] _  = putStrLn (paintStr " ---Empty dictionary---" red)
+aiMode dictionary wordLength = do
     let border     = "+======================+"
     let emptySpace = "\n|                      |"
 
@@ -111,17 +121,18 @@ aiMode dictionary = do
 
     mode <- getLine
 
+    let emptyGrayLines = ['x' | _ <- [1..wordLength]]
     
 
     if mode == "1" then do
             putStrLn ("\n" ++ "--- WORDLE GAME STARTED: Easy difficulty ---")
-            aiLoopNormal dictionary "xxxxx" 1
+            aiLoopNormal dictionary emptyGrayLines 1 emptyGrayLines
 
         else if mode == "2" 
             then do
             putStrLn ("\n" ++ "--- WORDLE GAME STARTED: Hard difficulty---")
             let expertDictionary = [ (word, 0) | word <- dictionary ]
-            aiLoopExpert expertDictionary 1
+            aiLoopExpert expertDictionary 1 emptyGrayLines
             else do
                 putStrLn (paintStr "\n==============================" red ++ "\n   --- Invalid mode! ---\n" ++ "==============================\n")
-                aiMode dictionary
+                aiMode dictionary wordLength
